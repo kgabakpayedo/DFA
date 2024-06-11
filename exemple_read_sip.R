@@ -3,6 +3,7 @@
 library('dplyr')
 library('tidyr')
 library('lubridate')
+library('ggplot2')
 
 data_sese <- "C:\\Users\\kgaba\\OneDrive - GENES\\Internship"
 
@@ -24,24 +25,49 @@ read_sip(csv_file = file.path(data_sese, 'dares_data', 'SIP_CPRO_CONT_ACTU.csv')
 toutes_tables <- rbind(annee2017, annee2018, annee2019, actu)
 
 toutes_tables <- toutes_tables %>% 
-  mutate(CIBLE = ifelse(SAL_SITAVTCONT == 9 & SAL_AGEDEBCONT >= 26, 1,0),
+  mutate(CIBLE = as.factor(ifelse(SAL_SITAVTCONT == 9 & SAL_AGEDEBCONT >= 26, 1,0)),
          CONT_TRIM_DEB = quarter(CONT_DATEDEB, type = "year.quarter"),
          CONT_TRIM_FIN = quarter(CONT_DATEFINEFF_POEM, type = "year.quarter"),
-         CONT_DUREFF = ceiling(difftime(CONT_DATEDEB, CONT_DATEFINEFF_POEM, units = "weeks")))
+         CONT_DUREFF = ceiling(difftime(CONT_DATEFINEFF_POEM, CONT_DATEDEB, units = "weeks"))) %>% 
+  arrange(CONT_TRIM_DEB)
 
-# Comment évoluent leurs entrées par rapport aux autres ? 
 
-toutes_tables %>%
-  mutate(duree = CONT_DATEFINEFF_POEM - CONT_DATEDEB) %>% 
-  filter(duree < month(6))
-  view()
+# Comment évoluent leur part dans les entrées en contrat pro par trimestre d'entrée ? 
 
-filter(CONT_DATEDEB > as.Date('2021-12-31') & CONT_DATEFINEFF_POEM <= as.Date('2022-12-31')) %>%
-group_by(SAL_SITAVTCONT, JEUNE) %>%
-summarise(n = n()) %>% 
-group_by(SAL_SITAVTCONT) %>% 
-mutate(share = n / sum(n)) %>% 
-View()
+share_table <- toutes_tables %>%
+  group_by(CONT_TRIM_DEB, CIBLE)%>% 
+  summarise(n=n()) %>%
+  group_by(CONT_TRIM_DEB) %>% 
+  mutate(share = n*100 / sum(n))
+
+
+share_table %>% 
+  ggplot(aes(CONT_TRIM_DEB, share, fill = CIBLE, group = CIBLE))+
+  geom_col(position = "dodge")
+
+
+share_table %>% 
+  filter(CIBLE == 1) %>% 
+  View()
+
+
+share_table <- toutes_tables %>%
+  filter(SAL_SITAVTCONT == 3) %>% 
+  mutate(CONT_ANNDEB = year(CONT_DATEDEB)) %>% 
+  group_by(CONT_ANNDEB, CONT_TRIM_DEB)%>% 
+  summarise(n=n()) %>%
+  group_by(CONT_ANNDEB) %>% 
+  mutate(share = n*100 / sum(n)) %>% 
+  View()
+
+toutes_tables %>% 
+  group_by(SAL_SITAVTCONT) %>% 
+  summarise(n = n())
+
+
+toutes_tables %>% 
+  group_by(SAL_SITAVTCONT) %>% 
+  summarise(mean_age = mean(SAL_AGEDEBCONT))
 
 
 # Quel niveau de diplômes à l'embauche ? 
